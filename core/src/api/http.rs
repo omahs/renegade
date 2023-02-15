@@ -14,6 +14,7 @@ use crate::{
         reporter::PriceReporterState,
         tokens::Token,
     },
+    state::NetworkOrder,
 };
 
 // ------------------------------------
@@ -70,6 +71,22 @@ pub struct CreateWalletRequest {
     pub keys: KeyChainAPIType,
     /// A randomness value to seed the wallet with
     pub randomness: BigUint,
+}
+
+// --------------------------------------------------
+// | Order Book Operations Request Response Formats |
+// --------------------------------------------------
+
+/// The request type for fetching order book state, empty
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OrderBookListRequest;
+/// The response type for fetching the order book state
+///
+/// The request type for this
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OrderBookListResponse {
+    /// A list of order identifier and order information pairs
+    pub orders: Vec<NetworkOrder>,
 }
 
 // --------------------------------------------

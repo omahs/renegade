@@ -29,7 +29,8 @@ use crate::{
 use super::{
     error::ApiServerError,
     http_handlers::{
-        ExchangeHealthStatesHandler, PingHandler, ReplicasHandler, WalletCreateHandler,
+        ExchangeHealthStatesHandler, OrderBookListHandler, PingHandler, ReplicasHandler,
+        WalletCreateHandler,
     },
     routes::Router,
     worker::ApiServerConfig,
@@ -46,6 +47,8 @@ const DUMMY_SUBSCRIPTION_TOPIC: &str = "dummy-topic";
 const PING_ROUTE: &str = "/ping";
 /// Exchange health check route
 const EXCHANGE_HEALTH_ROUTE: &str = "/exchange/health_check";
+/// Order book information endpoint
+const ORDER_BOOK_LIST_ROUTE: &str = "/orderbook/list";
 /// Returns the replicating nodes of a given wallet
 const REPLICAS_ROUTE: &str = "/replicas";
 /// Creates a new wallet with the given fees and keys and submits it to the contract
@@ -114,6 +117,13 @@ impl ApiServer {
 
         // The "/ping" route
         router.add_route(Method::GET, PING_ROUTE.to_string(), PingHandler::new());
+
+        // The "/orderbook/list" route
+        router.add_route(
+            Method::GET,
+            ORDER_BOOK_LIST_ROUTE.to_string(),
+            OrderBookListHandler::new(global_state.clone()),
+        );
 
         // The "/replicas" route
         router.add_route(

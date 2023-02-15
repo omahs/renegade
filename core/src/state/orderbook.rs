@@ -238,6 +238,17 @@ impl NetworkOrderBook {
         pairs
     }
 
+    /// Get all order information as a list of pairs; identifier and order info
+    pub fn get_all_orders(&self) -> Vec<NetworkOrder> {
+        let mut orders = Vec::with_capacity(self.order_map.len());
+        for order_id in self.order_map.keys() {
+            let info = self.read_order(order_id).unwrap().clone();
+            orders.push(info);
+        }
+
+        orders
+    }
+
     /// Returns whether or not the local node holds a proof of `VALID COMMITMENTS`
     /// for the given order
     pub fn has_validity_proof(&self, order_id: &OrderIdentifier) -> bool {

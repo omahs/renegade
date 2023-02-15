@@ -14,7 +14,8 @@ use tokio::sync::oneshot::channel as oneshot_channel;
 use crate::{
     api::http::{
         CreateWalletRequest, GetExchangeHealthStatesRequest, GetExchangeHealthStatesResponse,
-        GetReplicasRequest, GetReplicasResponse, PingRequest, PingResponse,
+        GetReplicasRequest, GetReplicasResponse, OrderBookListRequest, OrderBookListResponse,
+        PingRequest, PingResponse,
     },
     price_reporter::jobs::PriceReporterManagerJob,
     proof_generation::jobs::{ProofJob, ProofManagerJob},
@@ -109,11 +110,48 @@ impl TypedHandler for WalletCreateHandler {
     }
 }
 
+// -------------------
+// | Order Book APIs |
+// -------------------
+
+/// Handler for the /orderbook/list endpoint
+#[derive(Clone, Debug)]
+pub(crate) struct OrderBookListHandler {
+    /// A copy of the relayer-global state
+    global_state: RelayerState,
+}
+
+impl OrderBookListHandler {
+    /// Create a new handler for "/orderbook/list"
+    pub fn new(global_state: RelayerState) -> Self {
+        Self { global_state }
+    }
+}
+
+#[async_trait]
+impl TypedHandler for OrderBookListHandler {
+    type Request = OrderBookListRequest;
+    type Response = OrderBookListResponse;
+    type Error = ApiServerError;
+
+    async fn handle_typed(&self, _req: Self::Request) -> Result<Self::Response, Self::Error> {
+        // Fetch all the orders in the book from the global state
+        let mut orders = self.global_state.read_order_book().get_all_orders();
+
+        // Do not send validity proofs back with the response to save bandwidth
+        for order in orders.iter_mut() {
+            order.valid_commit_proof = None;
+        }
+
+        Ok(OrderBookListResponse { orders })
+    }
+}
+
 // ------------------------
 // | Price Reporting APIs |
 // ------------------------
 
-/// Handler for the / route, returns the health report for each individual
+/// Handler for the /exchange/health_check/ route, returns the health report for each individual
 /// exchange and the aggregate median
 #[derive(Clone, Debug)]
 pub(crate) struct ExchangeHealthStatesHandler {
