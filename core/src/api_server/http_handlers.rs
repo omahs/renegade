@@ -15,11 +15,11 @@ use crate::{
     api::http::{
         CreateWalletRequest, GetExchangeHealthStatesRequest, GetExchangeHealthStatesResponse,
         GetReplicasRequest, GetReplicasResponse, OrderBookListRequest, OrderBookListResponse,
-        PingRequest, PingResponse,
+        OrderCreateRequest, OrderCreateResponse, PingRequest, PingResponse,
     },
     price_reporter::jobs::PriceReporterManagerJob,
     proof_generation::jobs::{ProofJob, ProofManagerJob},
-    state::RelayerState,
+    state::{OrderIdentifier, RelayerState},
     MAX_FEES,
 };
 
@@ -107,6 +107,38 @@ impl TypedHandler for WalletCreateHandler {
         let resp = response_receiver.await.unwrap();
         println!("got proof back: {:?}", resp);
         Ok(())
+    }
+}
+
+/// Handler for the /wallet/orders/create endpoint
+///
+/// Adds a new order to the given wallet
+#[derive(Clone, Debug)]
+pub struct OrderCreateHandler {
+    /// A copy of the relayer-global state
+    global_state: RelayerState,
+}
+
+impl OrderCreateHandler {
+    /// Create a new handler for "/wallet/orders/create"
+    pub fn new(global_state: RelayerState) -> Self {
+        Self { global_state }
+    }
+}
+
+#[async_trait]
+impl TypedHandler for OrderCreateHandler {
+    type Request = OrderCreateRequest;
+    type Response = OrderCreateResponse;
+    type Error = ApiServerError;
+
+    async fn handle_typed(&self, req: Self::Request) -> Result<Self::Response, Self::Error> {
+        // Generate an ID for the order
+        let order_id = OrderIdentifier::new_v4();
+        self.global_state
+            .add_order_to_wallet(req.wallet_id, order_id, req.order);
+
+        Ok(OrderCreateResponse { order_id })
     }
 }
 

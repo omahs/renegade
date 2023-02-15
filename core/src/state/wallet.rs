@@ -5,7 +5,7 @@ use std::{
     convert::TryInto,
     fmt::{Display, Formatter, Result as FmtResult},
     iter,
-    sync::RwLockReadGuard,
+    sync::{RwLockReadGuard, RwLockWriteGuard},
 };
 
 use circuits::{
@@ -232,10 +232,17 @@ impl WalletIndex {
     // -----------
 
     /// Acquire a read lock on a wallet
-    pub fn read_wallet(&self, wallet_id: &Uuid) -> Option<RwLockReadGuard<Wallet>> {
+    pub fn read_wallet(&self, wallet_id: &WalletIdentifier) -> Option<RwLockReadGuard<Wallet>> {
         self.wallet_map
             .get(wallet_id)
             .map(|wallet| wallet.read().expect(ERR_WALLET_POISONED))
+    }
+
+    /// Acquire a write lock on a wallet
+    fn write_wallet(&self, wallet_id: &WalletIdentifier) -> Option<RwLockWriteGuard<Wallet>> {
+        self.wallet_map
+            .get(wallet_id)
+            .map(|wallet| wallet.write().expect(ERR_WALLET_POISONED))
     }
 
     // -----------
@@ -330,6 +337,18 @@ impl WalletIndex {
     pub fn add_wallet(&mut self, mut wallet: Wallet) {
         wallet.metadata.replicas.insert(self.peer_id);
         self.wallet_map.insert(wallet.wallet_id, new_shared(wallet));
+    }
+
+    /// Add an order to a given wallet
+    pub fn add_order_to_wallet(
+        &self,
+        wallet_id: &WalletIdentifier,
+        order_id: OrderIdentifier,
+        order: Order,
+    ) {
+        if let Some(mut wallet) = self.write_wallet(wallet_id) {
+            wallet.orders.insert(order_id, order);
+        }
     }
 
     /// Add a given peer as a replica of a wallet

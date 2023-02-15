@@ -3,6 +3,7 @@
 
 use circuits::{
     native_helpers::compute_poseidon_hash,
+    types::order::Order,
     zk_gadgets::merkle::{MerkleOpening, MerkleRoot},
 };
 use crossbeam::channel::Sender;
@@ -41,7 +42,7 @@ use crate::{
 use super::{
     orderbook::{NetworkOrderBook, OrderIdentifier},
     peers::PeerIndex,
-    wallet::{Wallet, WalletIndex},
+    wallet::{Wallet, WalletIdentifier, WalletIndex},
 };
 
 // -----------------------
@@ -406,6 +407,25 @@ impl RelayerState {
     pub fn add_cluster_peer(&self, peer_id: WrappedPeerId) {
         let mut locked_metadata = self.write_cluster_metadata();
         locked_metadata.add_member(peer_id)
+    }
+
+    /// Add a locally managed order to a wallet
+    pub fn add_order_to_wallet(
+        &self,
+        wallet_id: WalletIdentifier,
+        order_id: OrderIdentifier,
+        order: Order,
+    ) {
+        // Add the order to the wallet
+        self.read_wallet_index()
+            .add_order_to_wallet(&wallet_id, order_id, order);
+
+        // Add the order to the local order book
+        self.write_order_book().add_order(NetworkOrder::new(
+            order_id,
+            self.local_peer_id,
+            true, /* local */
+        ));
     }
 
     /// Add an order to the book

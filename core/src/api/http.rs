@@ -1,6 +1,6 @@
 //! Groups API definitions for the externally facing HTTP API
 
-use circuits::types::{fee::Fee, keychain::KeyChain};
+use circuits::types::{fee::Fee, keychain::KeyChain, order::Order};
 use crypto::fields::biguint_to_scalar;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
@@ -14,7 +14,7 @@ use crate::{
         reporter::PriceReporterState,
         tokens::Token,
     },
-    state::NetworkOrder,
+    state::{wallet::WalletIdentifier, NetworkOrder, OrderIdentifier},
 };
 
 // ------------------------------------
@@ -71,6 +71,22 @@ pub struct CreateWalletRequest {
     pub keys: KeyChainAPIType,
     /// A randomness value to seed the wallet with
     pub randomness: BigUint,
+}
+
+/// Request type for the /wallet/orders/create endpoint
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OrderCreateRequest {
+    /// The identifier of the wallet to add the order to
+    pub wallet_id: WalletIdentifier,
+    /// The order to add to the wallet
+    pub order: Order,
+}
+
+/// Response type for the /wallet/orders/create endpoint
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OrderCreateResponse {
+    /// The identifier of the order that was created
+    pub order_id: OrderIdentifier,
 }
 
 // --------------------------------------------------

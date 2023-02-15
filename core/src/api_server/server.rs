@@ -30,7 +30,7 @@ use super::{
     error::ApiServerError,
     http_handlers::{
         ExchangeHealthStatesHandler, OrderBookListHandler, PingHandler, ReplicasHandler,
-        WalletCreateHandler,
+        WalletCreateHandler, OrderCreateHandler,
     },
     routes::Router,
     worker::ApiServerConfig,
@@ -53,6 +53,8 @@ const ORDER_BOOK_LIST_ROUTE: &str = "/orderbook/list";
 const REPLICAS_ROUTE: &str = "/replicas";
 /// Creates a new wallet with the given fees and keys and submits it to the contract
 const WALLET_CREATE_ROUTE: &str = "/wallet/create";
+/// Creates a new order within a wallet
+const WALLET_ORDER_CREATE_ROUTE: &str = "/wallet/orders/create";
 
 /// Accepts inbound HTTP requests and websocket subscriptions and
 /// serves requests from those connections
@@ -129,7 +131,7 @@ impl ApiServer {
         router.add_route(
             Method::POST,
             REPLICAS_ROUTE.to_string(),
-            ReplicasHandler::new(global_state),
+            ReplicasHandler::new(global_state.clone()),
         );
 
         // The "/wallet/create" route
@@ -137,6 +139,13 @@ impl ApiServer {
             Method::POST,
             WALLET_CREATE_ROUTE.to_string(),
             WalletCreateHandler::new(config.proof_generation_work_queue),
+        );
+
+        // The "/wallet/orders/create" route
+        router.add_route(
+            Method::POST, 
+            WALLET_ORDER_CREATE_ROUTE.to_string(), 
+            OrderCreateHandler::new(global_state),
         );
     }
 
