@@ -1,6 +1,6 @@
 //! Groups API definitions for the externally facing HTTP API
 
-use circuits::types::{fee::Fee, keychain::KeyChain, order::Order};
+use circuits::types::{balance::Balance, fee::Fee, keychain::KeyChain, order::Order};
 use crypto::fields::biguint_to_scalar;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
@@ -60,6 +60,37 @@ impl From<KeyChainAPIType> for KeyChain {
             pk_view: biguint_to_scalar(&keychain.pk_view),
         }
     }
+}
+
+/// An API type used for wallet operations
+/// TODO: Remove this with the
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WalletApiType {
+    /// The balances in the wallet
+    pub balances: Vec<Balance>,
+    /// The orders in the wallet
+    pub orders: Vec<Order>,
+    /// The fees in the wallet
+    pub fees: Vec<Fee>,
+    /// The public keychain
+    pub public_keys: KeyChainAPIType,
+    /// The wallet randomness
+    pub randomness: BigUint,
+}
+
+/// The request type to add a new wallet to the state
+/// TODO: Remove this along with the associated endpoint
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WalletAddRequest {
+    /// The wallet to add to the managed state
+    pub wallet: WalletApiType,
+}
+
+/// The response type to the add wallet request
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WalletAddResponse {
+    /// The ID of the newly created wallet
+    pub wallet_id: WalletIdentifier,
 }
 
 /// The request type to create a new wallet

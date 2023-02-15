@@ -1,11 +1,13 @@
 //! Groups handlers for the HTTP API
 
 use async_trait::async_trait;
-use circuits::types::fee::Fee;
+use circuits::types::{balance::Balance, fee::Fee, order::Order};
 use crossbeam::channel::{self, Sender};
 use crypto::fields::biguint_to_scalar;
+use curve25519_dalek::scalar::Scalar;
 use itertools::Itertools;
 use std::{
+    collections::{HashMap, HashSet},
     iter,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -15,11 +17,15 @@ use crate::{
     api::http::{
         CreateWalletRequest, GetExchangeHealthStatesRequest, GetExchangeHealthStatesResponse,
         GetReplicasRequest, GetReplicasResponse, OrderBookListRequest, OrderBookListResponse,
-        OrderCreateRequest, OrderCreateResponse, PingRequest, PingResponse,
+        OrderCreateRequest, OrderCreateResponse, PingRequest, PingResponse, WalletAddRequest,
+        WalletAddResponse,
     },
     price_reporter::jobs::PriceReporterManagerJob,
     proof_generation::jobs::{ProofJob, ProofManagerJob},
-    state::{OrderIdentifier, RelayerState},
+    state::{
+        wallet::{PrivateKeyChain, Wallet as StateWallet, WalletIdentifier, WalletMetadata},
+        OrderIdentifier, RelayerState,
+    },
     MAX_FEES,
 };
 
@@ -57,6 +63,72 @@ impl TypedHandler for PingHandler {
 // --------------------------
 // | Wallet Operations APIs |
 // --------------------------
+
+/// Handler for the /wallet/add route
+/// TODO: Remove this handler with the endpoint
+#[derive(Debug)]
+pub struct WalletAddHandler {
+    /// A copy of the relayer-global state
+    global_state: RelayerState,
+}
+
+impl WalletAddHandler {
+    /// Create a new handler for the /wallet/add route
+    pub fn new(global_state: RelayerState) -> Self {
+        Self { global_state }
+    }
+}
+
+#[async_trait]
+impl TypedHandler for WalletAddHandler {
+    type Request = WalletAddRequest;
+    type Response = WalletAddResponse;
+    type Error = ApiServerError;
+
+    async fn handle_typed(&self, req: Self::Request) -> Result<Self::Response, Self::Error> {
+        // Create an indexable wallet type from the given wallet
+        let wallet_id = WalletIdentifier::new_v4();
+        let order_map: HashMap<OrderIdentifier, Order> = req
+            .wallet
+            .orders
+            .iter()
+            .map(|order| (OrderIdentifier::new_v4(), order.clone()))
+            .collect();
+
+        let balance_map: HashMap<u64, Balance> = req
+            .wallet
+            .balances
+            .iter()
+            .map(|balance| (balance.mint, balance.clone()))
+            .collect();
+
+        let dummy_secret_keys = PrivateKeyChain {
+            sk_root: None,
+            sk_match: Scalar::zero(),
+            sk_settle: Scalar::zero(),
+            sk_view: Scalar::zero(),
+        };
+
+        let metadata = WalletMetadata {
+            replicas: HashSet::new(),
+        };
+
+        let indexable_wallet = StateWallet {
+            wallet_id,
+            orders: order_map,
+            balances: balance_map,
+            fees: req.wallet.fees.clone(),
+            public_keys: req.wallet.public_keys.into(),
+            secret_keys: dummy_secret_keys,
+            randomness: req.wallet.randomness,
+            metadata,
+        };
+
+        self.global_state.add_wallets(vec![indexable_wallet]);
+
+        Ok(WalletAddResponse { wallet_id })
+    }
+}
 
 /// Handler for the /wallet/create route
 #[derive(Debug)]

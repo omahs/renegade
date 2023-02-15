@@ -29,8 +29,8 @@ use crate::{
 use super::{
     error::ApiServerError,
     http_handlers::{
-        ExchangeHealthStatesHandler, OrderBookListHandler, PingHandler, ReplicasHandler,
-        WalletCreateHandler, OrderCreateHandler,
+        ExchangeHealthStatesHandler, OrderBookListHandler, OrderCreateHandler, PingHandler,
+        ReplicasHandler, WalletCreateHandler, WalletAddHandler,
     },
     routes::Router,
     worker::ApiServerConfig,
@@ -51,6 +51,9 @@ const EXCHANGE_HEALTH_ROUTE: &str = "/exchange/health_check";
 const ORDER_BOOK_LIST_ROUTE: &str = "/orderbook/list";
 /// Returns the replicating nodes of a given wallet
 const REPLICAS_ROUTE: &str = "/replicas";
+/// Dummy endpoint for creating a new, complete wallet
+/// TODO: Remove this endpoint, handler, and request/response types
+const ADD_WALLET_ROUTE: &str = "/wallet/add";
 /// Creates a new wallet with the given fees and keys and submits it to the contract
 const WALLET_CREATE_ROUTE: &str = "/wallet/create";
 /// Creates a new order within a wallet
@@ -134,6 +137,13 @@ impl ApiServer {
             ReplicasHandler::new(global_state.clone()),
         );
 
+        // The "/wallet/add" route
+        router.add_route(
+            Method::POST, 
+            ADD_WALLET_ROUTE.to_string(), 
+            WalletAddHandler::new(global_state.clone())
+        );
+
         // The "/wallet/create" route
         router.add_route(
             Method::POST,
@@ -143,8 +153,8 @@ impl ApiServer {
 
         // The "/wallet/orders/create" route
         router.add_route(
-            Method::POST, 
-            WALLET_ORDER_CREATE_ROUTE.to_string(), 
+            Method::POST,
+            WALLET_ORDER_CREATE_ROUTE.to_string(),
             OrderCreateHandler::new(global_state),
         );
     }
