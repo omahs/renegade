@@ -35,7 +35,7 @@ use crate::{
     proof_generation::jobs::{ProofJob, ProofManagerJob, ValidCommitmentsBundle},
     state::orderbook::NetworkOrder,
     system_bus::SystemBus,
-    types::SystemBusMessage,
+    types::{SystemBusMessage, WALLET_UPDATE_TOPIC},
     MERKLE_HEIGHT,
 };
 
@@ -95,6 +95,8 @@ pub struct RelayerState {
     pub handshake_priorities: Shared<HashMap<WrappedPeerId, NonZeroU32>>,
     /// Information about the local peer's cluster
     pub cluster_metadata: Shared<ClusterMetadata>,
+    /// A copy of the system bus used to stream state updates
+    pub system_bus: SystemBus<SystemBusMessage>,
 }
 
 /// Metadata about the local peer's cluster
@@ -148,7 +150,7 @@ impl RelayerState {
         let peer_index = PeerIndex::new(local_peer_id);
 
         // Setup the order book
-        let order_book = NetworkOrderBook::new(system_bus);
+        let order_book = NetworkOrderBook::new(system_bus.clone());
 
         Self {
             debug,
@@ -162,6 +164,7 @@ impl RelayerState {
             order_book: new_shared(order_book),
             handshake_priorities: new_shared(HashMap::new()),
             cluster_metadata: new_shared(ClusterMetadata::new(cluster_id)),
+            system_bus,
         }
     }
 
@@ -469,8 +472,11 @@ impl RelayerState {
         match_res: MatchResult,
     ) {
         // Lock the wallet to modify the orders
-        let locked_wallet_index = self.read_wallet_index();
-        let mut wallet = locked_wallet_index.write_wallet(&wallet_id).unwrap();
+        let mut wallet = {
+            let locked_wallet_index = self.read_wallet_index();
+            let wallet = locked_wallet_index.read_wallet(&wallet_id).unwrap();
+            wallet.clone()
+        }; // locked_wallet_index released
         let order = wallet.orders.get(&order_id).unwrap().clone();
 
         let order_filled = match_res.base_amount == order.amount;
@@ -509,6 +515,17 @@ impl RelayerState {
                 true, /* local */
             ));
         }
+
+        // Write back the new wallet and publish a message to the system bus
+        self.write_wallet_index().add_wallet(wallet.clone());
+
+        self.system_bus.publish(
+            WALLET_UPDATE_TOPIC.to_string(),
+            SystemBusMessage::WalletUpdate {
+                wallet_id: wallet.wallet_id,
+                wallet,
+            },
+        );
     }
 
     /// Mark an order pair as matched, this is both for bookkeeping and for

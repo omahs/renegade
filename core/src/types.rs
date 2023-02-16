@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     price_reporter::reporter::PriceReport,
-    state::{NetworkOrderState, OrderIdentifier},
+    state::{
+        wallet::{Wallet, WalletIdentifier},
+        NetworkOrderState, OrderIdentifier,
+    },
     MAX_BALANCES, MAX_FEES, MAX_ORDERS,
 };
 
@@ -25,6 +28,8 @@ pub type SizedValidCommitments = ValidCommitments<MAX_BALANCES, MAX_ORDERS, MAX_
 pub const HANDSHAKE_STATUS_TOPIC: &str = "handshakes";
 /// The topic published to when a state change occurs on an order
 pub const ORDER_STATE_CHANGE_TOPIC: &str = "order-state";
+/// The topic published to when a wallet is updated
+pub const WALLET_UPDATE_TOPIC: &str = "wallet-update";
 
 // ----------------------------
 // | System Bus Message Types |
@@ -33,6 +38,7 @@ pub const ORDER_STATE_CHANGE_TOPIC: &str = "order-state";
 /// A message type for generic system bus messages, broadcast to all modules
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
+#[allow(clippy::large_enum_variant)]
 pub enum SystemBusMessage {
     /// A message indicating that a handshake with a peer has started
     HandshakeInProgress {
@@ -62,6 +68,13 @@ pub enum SystemBusMessage {
     PriceReportMedian(PriceReport),
     /// A message indicating that a new individual exchange PriceReport has been published
     PriceReportExchange(PriceReport),
+    /// A message indicating that a wallet has been updated, possibly by a match
+    WalletUpdate {
+        /// The ID of the wallet that was updated
+        wallet_id: WalletIdentifier,
+        /// The updated wallet
+        wallet: Wallet,
+    },
 }
 
 /// A wrapper around a SystemBusMessage containing the topic, used for serializing websocket
