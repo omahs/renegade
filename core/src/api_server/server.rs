@@ -30,7 +30,7 @@ use super::{
     error::ApiServerError,
     http_handlers::{
         ExchangeHealthStatesHandler, OrderBookListHandler, OrderCreateHandler, PingHandler,
-        ReplicasHandler, WalletCreateHandler, WalletAddHandler,
+        ReplicasHandler, WalletAddHandler, WalletCreateHandler,
     },
     routes::Router,
     worker::ApiServerConfig,
@@ -139,9 +139,9 @@ impl ApiServer {
 
         // The "/wallet/add" route
         router.add_route(
-            Method::POST, 
-            ADD_WALLET_ROUTE.to_string(), 
-            WalletAddHandler::new(global_state.clone())
+            Method::POST,
+            ADD_WALLET_ROUTE.to_string(),
+            WalletAddHandler::new(global_state.clone()),
         );
 
         // The "/wallet/create" route

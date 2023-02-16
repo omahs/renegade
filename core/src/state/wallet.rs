@@ -134,8 +134,10 @@ impl<'de> Visitor<'de> for PrivateKeyChainVisitor {
 pub struct Wallet {
     /// The identifier used to index the wallet
     pub wallet_id: WalletIdentifier,
-    /// A list of orders in this wallet
+    /// A list of open orders in this wallet
     pub orders: HashMap<OrderIdentifier, Order>,
+    /// A list of previously matched orders from this wallet
+    pub matched_orders: HashMap<OrderIdentifier, Order>,
     /// A mapping of mint (u64) to Balance information
     /// TODO: Key by BigUint to adequately represent mints
     pub balances: HashMap<u64, Balance>,
@@ -239,7 +241,10 @@ impl WalletIndex {
     }
 
     /// Acquire a write lock on a wallet
-    fn write_wallet(&self, wallet_id: &WalletIdentifier) -> Option<RwLockWriteGuard<Wallet>> {
+    pub(super) fn write_wallet(
+        &self,
+        wallet_id: &WalletIdentifier,
+    ) -> Option<RwLockWriteGuard<Wallet>> {
         self.wallet_map
             .get(wallet_id)
             .map(|wallet| wallet.write().expect(ERR_WALLET_POISONED))

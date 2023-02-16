@@ -7,7 +7,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use crate::state::{OrderIdentifier, Shared};
+use crate::state::{wallet::WalletIdentifier, OrderIdentifier, Shared};
 
 use super::{error::HandshakeManagerError, types::HashOutput};
 use circuits::types::{balance::Balance, fee::Fee, order::Order};
@@ -37,6 +37,7 @@ impl HandshakeStateIndex {
         &self,
         request_id: Uuid,
         local_order_id: OrderIdentifier,
+        local_wallet_id: WalletIdentifier,
         order: Order,
         balance: Balance,
         fee: Fee,
@@ -51,6 +52,7 @@ impl HandshakeStateIndex {
             // Dummy value for peer_order_id
             Uuid::default(),
             local_order_id,
+            local_wallet_id,
             order,
             balance,
             fee,
@@ -73,6 +75,7 @@ impl HandshakeStateIndex {
         request_id: Uuid,
         peer_order_id: OrderIdentifier,
         local_order_id: OrderIdentifier,
+        local_wallet_id: WalletIdentifier,
         order: Order,
         balance: Balance,
         fee: Fee,
@@ -92,6 +95,7 @@ impl HandshakeStateIndex {
                 request_id,
                 peer_order_id,
                 local_order_id,
+                local_wallet_id,
                 order,
                 balance,
                 fee,
@@ -182,6 +186,8 @@ pub struct HandshakeState {
     pub peer_order_id: OrderIdentifier,
     /// The identifier of the order that the local peer has proposed for match
     pub local_order_id: OrderIdentifier,
+    /// The identifier of the local wallet that this order belongs to
+    pub local_wallet_id: WalletIdentifier,
     /// The local peer's order being matched on
     pub order: Order,
     /// The local peer's balance, covering their side of the order
@@ -234,6 +240,7 @@ impl HandshakeState {
         request_id: Uuid,
         peer_order_id: OrderIdentifier,
         local_order_id: OrderIdentifier,
+        local_wallet_id: WalletIdentifier,
         order: Order,
         balance: Balance,
         fee: Fee,
@@ -250,6 +257,7 @@ impl HandshakeState {
             request_id,
             peer_order_id,
             local_order_id,
+            local_wallet_id,
             order,
             balance,
             fee,

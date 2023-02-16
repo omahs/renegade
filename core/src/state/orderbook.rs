@@ -13,6 +13,7 @@
 // TODO: Remove this lint allowance
 #![allow(unused)]
 
+use circuits::types::r#match::MatchResult;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -132,11 +133,6 @@ impl NetworkOrder {
 
     /// Transitions the state of an order from `Verified` to `Matched`
     pub(self) fn transition_matched(&mut self, by_local_node: bool) {
-        assert_eq!(
-            self.state,
-            NetworkOrderState::Verified,
-            "order must be in Verified state to transition to Matched"
-        );
         self.state = NetworkOrderState::Matched { by_local_node };
     }
 
@@ -295,6 +291,19 @@ impl NetworkOrderBook {
         }
     }
 
+    /// Updates an order's volume after a match has completed
+    ///
+    /// If the order was completely filled (smaller volume than counterparty), the
+    /// order is replaced with an order in the `Matched` state
+    ///
+    /// If the order was not completely filled (larger volume than counterparty), the
+    /// order is replaced with two orders: a partial fill in the `Matched` state, and a
+    /// residue order, now in the `Received` state
+    pub(super) fn apply_match_to_order(&self, order_id: OrderIdentifier, match_: MatchResult) {
+        let mut order_info = self.write_order(&order_id).unwrap();
+        unimplemented!("")
+    }
+
     // --------------------------
     // | Order State Transition |
     // --------------------------
@@ -339,7 +348,7 @@ impl NetworkOrderBook {
     }
 
     /// Transitions the state of an order from `Verified` to `Matched`
-    pub fn transition_matched(&mut self, order_id: &OrderIdentifier, by_local_node: bool) {
+    pub fn transition_matched(&self, order_id: &OrderIdentifier, by_local_node: bool) {
         if let Some(mut order) = self.write_order(order_id) {
             let prev_state = order.state;
             order.transition_matched(by_local_node);

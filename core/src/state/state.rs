@@ -3,7 +3,7 @@
 
 use circuits::{
     native_helpers::compute_poseidon_hash,
-    types::order::Order,
+    types::{order::Order, r#match::MatchResult},
     zk_gadgets::merkle::{MerkleOpening, MerkleRoot},
 };
 use crossbeam::channel::Sender;
@@ -454,6 +454,57 @@ impl RelayerState {
         for order_id in new_orders.into_iter() {
             locked_order_book.add_order(NetworkOrder::new(
                 order_id,
+                self.local_peer_id,
+                true, /* local */
+            ));
+        }
+    }
+
+    /// Record a match on a given order pair; update the local order state with the
+    /// filled partial order and any remaining after the match
+    pub fn update_order_after_match(
+        &self,
+        order_id: OrderIdentifier,
+        wallet_id: WalletIdentifier,
+        match_res: MatchResult,
+    ) {
+        // Lock the wallet to modify the orders
+        let locked_wallet_index = self.read_wallet_index();
+        let mut wallet = locked_wallet_index.write_wallet(&wallet_id).unwrap();
+        let order = wallet.orders.get(&order_id).unwrap().clone();
+
+        let order_filled = match_res.base_amount == order.amount;
+
+        // If the order was filled, replace it with a single order in the `Matched` state
+        if order_filled {
+            self.read_order_book()
+                .transition_matched(&order_id, true /* by_local_node */);
+
+            // Remove and place in the matched orders list
+            wallet.orders.remove(&order_id);
+            wallet.matched_orders.insert(order_id, order);
+        } else {
+            // Split the order
+            let filled_order_id = order_id;
+            let mut filled_order = order.clone();
+            filled_order.amount = match_res.base_amount;
+
+            let open_order_id = OrderIdentifier::new_v4();
+            let mut open_order = order.clone();
+            open_order.amount = order.amount - match_res.base_amount;
+
+            // Add the orders to the wallet
+            wallet.orders.remove(&order_id);
+            wallet.orders.insert(open_order_id, open_order);
+            wallet.matched_orders.insert(filled_order_id, filled_order);
+
+            // Replace the state in the orderbook
+            {
+                self.read_order_book()
+                    .transition_matched(&order_id, true /* by_local_node */);
+            }
+            self.write_order_book().add_order(NetworkOrder::new(
+                open_order_id,
                 self.local_peer_id,
                 true, /* local */
             ));

@@ -7,7 +7,11 @@ use circuits::{
     mpc::SharedFabric,
     mpc_circuits::r#match::compute_match,
     multiprover_prove,
-    types::{balance::Balance, order::Order, r#match::AuthenticatedMatchResult},
+    types::{
+        balance::Balance,
+        order::Order,
+        r#match::{AuthenticatedMatchResult, MatchResult},
+    },
     verify_collaborative_proof,
     zk_circuits::valid_match_mpc::{
         ValidMatchMpcCircuit, ValidMatchMpcStatement, ValidMatchMpcWitness,
@@ -38,7 +42,7 @@ impl HandshakeExecutor {
         party_id: u64,
         handshake_state: HandshakeState,
         mpc_net: QuicTwoPartyNet,
-    ) -> Result<(), HandshakeManagerError> {
+    ) -> Result<MatchResult, HandshakeManagerError> {
         // Build a tokio runtime in the current thread for the MPC to run inside of
         let tid = thread::current().id();
         let tokio_runtime = TokioBuilder::new_multi_thread()
@@ -53,10 +57,10 @@ impl HandshakeExecutor {
             Self::execute_match_impl(party_id, handshake_state.to_owned(), mpc_net)
         });
 
-        block_on(join_handle).unwrap()?;
+        let res = block_on(join_handle).unwrap();
         log::info!("Finished match!");
 
-        Ok(())
+        res
     }
 
     /// Implementation of the execute_match method that is wrapped in a Tokio runtime
@@ -64,7 +68,7 @@ impl HandshakeExecutor {
         party_id: u64,
         handshake_state: HandshakeState,
         mut mpc_net: QuicTwoPartyNet,
-    ) -> Result<(), HandshakeManagerError> {
+    ) -> Result<MatchResult, HandshakeManagerError> {
         log::info!("Matching order...");
         // Connect the network
         block_on(mpc_net.connect())
@@ -90,9 +94,14 @@ impl HandshakeExecutor {
             handshake_state.order,
             handshake_state.balance,
             statement,
-            match_res,
+            match_res.clone(),
             shared_fabric,
-        )
+        )?;
+
+        // Open the match result and return
+        match_res
+            .open()
+            .map_err(|err| HandshakeManagerError::MpcNetwork(err.to_string()))
     }
 
     /// Execute the match MPC over the provisioned QUIC stream

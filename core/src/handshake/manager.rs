@@ -32,7 +32,7 @@ use crate::{
         handshake::HandshakeMessage,
     },
     gossip::types::WrappedPeerId,
-    state::{OrderIdentifier, RelayerState},
+    state::{wallet::WalletIdentifier, OrderIdentifier, RelayerState},
     system_bus::SystemBus,
     types::{SystemBusMessage, HANDSHAKE_STATUS_TOPIC},
     CancelChannel,
@@ -221,6 +221,8 @@ impl HandshakeExecutor {
                             request_id
                         ))
                     })?;
+                let order_id = order_state.local_order_id;
+                let wallet_id = order_state.local_wallet_id;
 
                 // Mark the handshake cache entry as invisible to avoid re-scheduling
                 self.handshake_cache
@@ -242,17 +244,22 @@ impl HandshakeExecutor {
                 );
 
                 // Run the MPC match process
-                Self::execute_match(party_id, order_state, net)?;
+                let res = Self::execute_match(party_id, order_state, net)?;
 
                 // Record the match in the cache
-                self.record_completed_match(request_id)
+                self.record_completed_match(request_id)?;
+
+                // Update the order in the global state
+                self.global_state
+                    .update_order_after_match(order_id, wallet_id, res);
+                Ok(())
             }
         }
     }
 
     /// Perform a handshake with a peer
     pub fn perform_handshake(&self, peer_id: WrappedPeerId) -> Result<(), HandshakeManagerError> {
-        if let Some((order_id, order, balance, fee)) =
+        if let Some((order_id, wallet_id, order, balance, fee)) =
             self.choose_order_balance_fee(None /* peer_order */)
         {
             // Hash the balance, order, fee, and wallet randomness
@@ -288,6 +295,7 @@ impl HandshakeExecutor {
             self.handshake_state_index.new_handshake(
                 request_id,
                 order_id,
+                wallet_id,
                 order,
                 balance,
                 fee,
@@ -387,7 +395,7 @@ impl HandshakeExecutor {
         peer_randomness_hash: HashOutput,
         response_channel: Option<ResponseChannel<AuthenticatedGossipResponse>>,
     ) -> Result<(), HandshakeManagerError> {
-        let response = if let Some((order_id, order, balance, fee)) =
+        let response = if let Some((order_id, wallet_id, order, balance, fee)) =
             self.choose_order_balance_fee(Some(peer_order))
         {
             // Hash the balance, order, fee, and wallet randomness
@@ -405,6 +413,7 @@ impl HandshakeExecutor {
                 request_id,
                 peer_order,
                 order_id,
+                wallet_id,
                 order,
                 balance,
                 fee,
@@ -615,7 +624,7 @@ impl HandshakeExecutor {
     fn choose_order_balance_fee(
         &self,
         peer_order: Option<OrderIdentifier>,
-    ) -> Option<(OrderIdentifier, Order, Balance, Fee)> {
+    ) -> Option<(OrderIdentifier, WalletIdentifier, Order, Balance, Fee)> {
         let mut rng = thread_rng();
         let mut proposed_order = None;
 
@@ -652,7 +661,7 @@ impl HandshakeExecutor {
         let (order_id, order) = proposed_order?;
         let (balance, fee) = self.get_balance_and_fee(&order, selected_wallet)?;
 
-        Some((order_id, order, balance, fee))
+        Some((order_id, selected_wallet, order, balance, fee))
     }
 
     /// Find a balance and fee for the given order

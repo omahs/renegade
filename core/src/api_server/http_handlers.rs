@@ -116,6 +116,7 @@ impl TypedHandler for WalletAddHandler {
         let indexable_wallet = StateWallet {
             wallet_id,
             orders: order_map,
+            matched_orders: HashMap::new(),
             balances: balance_map,
             fees: req.wallet.fees.clone(),
             public_keys: req.wallet.public_keys.into(),
